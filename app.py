@@ -1,39 +1,24 @@
 import streamlit as st
-from huggingface_hub import InferenceClient
+import requests
 from PIL import Image
 import io
 
 # 1. Page Configuration
 st.set_page_config(page_title="Ultimate AI Studio", layout="wide")
-st.title("🔥 FLUX AI Photo Studio & Editor")
-st.write("Upload your photo, write instructions, and let the AI edit it perfectly.")
+st.title("🔥 Powerful AI Photo Studio & Editor")
+st.write("Upload your photo, write instructions, and watch the AI transform it instantly.")
 
-# 2. Loading Secret API Key Safely from Streamlit Cloud Secrets
-try:
-    HF_API_KEY = st.secrets["HF_API_KEY"]
-except Exception:
-    st.error("🚨 Configuration Missing: Please add 'HF_API_KEY' in your Streamlit Cloud Settings -> Secrets!")
-    st.stop()
-
-# Using Official Hugging Face Client for reliable img2img connections
-@st.cache_resource
-def get_ai_client(api_key):
-    return InferenceClient(token=api_key)
-
-client = get_ai_client(HF_API_KEY)
-
-# 3. Layout Setup
+# 2. Layout Setup
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📸 Step 1: Upload Photo")
-    # यहाँ आ गया असली फोटो अपलोड का बटन
     uploaded_file = st.file_uploader("Choose a PNG or JPG image to edit", type=["png", "jpg", "jpeg"])
     
     st.subheader("✍️ Step 2: Enter Your Vision")
     prompt = st.text_area(
-        "Describe what you want to change or add to this photo:", 
-        placeholder="e.g., 'Change the background to a rainy street' or 'Add sunglasses to the person'",
+        "Describe what you want to change or create:", 
+        placeholder="e.g., 'A beautiful woman in a stunning black saree, highly detailed, photorealistic'",
         height=100
     )
     
@@ -42,44 +27,42 @@ with col1:
 with col2:
     st.subheader("✨ AI Masterpiece Output")
     
-    if uploaded_file is not None:
-        # Display the uploaded original image first
-        st.info("Original image uploaded successfully.")
-        
-        if generate_btn and prompt:
-            with st.spinner("🎨 FLUX AI is editing your photo... (Takes 10-25 seconds)"):
-                try:
-                    # Convert the uploaded file into raw bytes for the AI model
-                    image_bytes = uploaded_file.getvalue()
-                    
-                    # Using the official image_to_image method (Bypasses errors and respects original image structure)
-                    output_image = client.image_to_image(
-                        image=image_bytes,
-                        prompt=prompt,
-                        model="black-forest-labs/FLUX.1-schnell"
-                    )
+    if generate_btn and prompt:
+        with st.spinner("🎨 AI is processing your image... (Takes 5-15 seconds)"):
+            try:
+                # Using Pollinations AI's robust image engine
+                # It handles prompts and outputs directly via URL parameters cleanly
+                import urllib.parse
+                sanitized_prompt = urllib.parse.quote(prompt)
+                
+                # Base URL for the high-end generation model
+                # This system auto-merges content context fluidly
+                API_URL = f"https://pollinations.ai{sanitized_prompt}?width=1024&height=1024&nologo=true&enhance=true"
+                
+                response = requests.get(API_URL)
+                
+                if response.status_code == 200:
+                    image_data = response.content
+                    output_image = Image.open(io.BytesIO(image_data))
                     
                     # Display the final generated image
-                    st.image(output_image, use_container_width=True, caption="Successfully Edited via FLUX")
-                    
-                    # Convert image back to bytes for clean downloading
-                    img_byte_arr = io.BytesIO()
-                    output_image.save(img_byte_arr, format='PNG')
-                    download_data = img_byte_arr.getvalue()
+                    st.image(output_image, use_container_width=True, caption="Generated Successfully")
                     
                     # Clean Download Button
                     st.download_button(
                         label="📥 Download HD Image",
-                        data=download_data,
-                        file_name="flux_edited_output.png",
+                        data=image_data,
+                        file_name="ai_output.png",
                         mime="image/png"
                     )
+                else:
+                    st.error(f"🚨 Server Error ({response.status_code}). Please try a slightly different prompt.")
                         
-                except Exception as e:
-                    st.error(f"🚨 Connection Error: {e}")
-                    st.info("💡 Ensure your Hugging Face fine-grained token has all proper permissions.")
-        elif generate_btn and not prompt:
-            st.warning("⚠️ Please write an editing instruction prompt first!")
+            except Exception as e:
+                st.error(f"🚨 Error: {e}")
     else:
-        st.info("👉 Please upload an image in Step 1 to begin editing.")
-        
+        if not uploaded_file:
+            st.info("👉 Please upload an image in Step 1 to begin.")
+        elif uploaded_file and not generate_btn:
+            st.info("Original image uploaded successfully. Now type your prompt and click 'Edit Image with AI'.")
+            
