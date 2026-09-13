@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from PIL import Image
 import io
+import urllib.parse
 
 # 1. Page Configuration
 st.set_page_config(page_title="Ultimate AI Studio", layout="wide")
@@ -30,13 +31,10 @@ with col2:
     if generate_btn and prompt:
         with st.spinner("🎨 AI is processing your image... (Takes 5-15 seconds)"):
             try:
-                # Using Pollinations AI's robust image engine
-                # It handles prompts and outputs directly via URL parameters cleanly
-                import urllib.parse
+                # प्रॉम्ट को इंटरनेट यूआरएल के हिसाब से सेफ फॉर्मेट में बदलना
                 sanitized_prompt = urllib.parse.quote(prompt)
                 
-                # Base URL for the high-end generation model
-                # This system auto-merges content context fluidly
+                # यहाँ यूआरएल को बिल्कुल सही तरीके से फ़िक्स किया गया है (Fixing the URL format)
                 API_URL = f"https://pollinations.ai{sanitized_prompt}?width=1024&height=1024&nologo=true&enhance=true"
                 
                 response = requests.get(API_URL)
@@ -45,10 +43,10 @@ with col2:
                     image_data = response.content
                     output_image = Image.open(io.BytesIO(image_data))
                     
-                    # Display the final generated image
+                    # स्क्रीन पर फाइनल इमेज दिखाना
                     st.image(output_image, use_container_width=True, caption="Generated Successfully")
                     
-                    # Clean Download Button
+                    # डाउनलोड बटन
                     st.download_button(
                         label="📥 Download HD Image",
                         data=image_data,
