@@ -1,12 +1,12 @@
 import streamlit as st
-import requests
+from huggingface_hub import InferenceClient
 from PIL import Image
 import io
 
 # 1. Page Configuration
 st.set_page_config(page_title="Ultimate AI Studio", layout="wide")
 st.title("🔥 FLUX AI Photo Studio")
-st.write("Type your commands below to generate or edit high-definition visuals.")
+st.write("Type your commands below to generate high-definition visuals using official API methods.")
 
 # 2. Loading Secret API Key Safely from Streamlit Cloud Secrets
 try:
@@ -15,9 +15,12 @@ except Exception:
     st.error("🚨 Configuration Missing: Please add 'HF_API_KEY' in your Streamlit Cloud Settings -> Secrets!")
     st.stop()
 
-# Using Black Forest Labs FLUX.1-schnell model
-MODEL_URL = "https://huggingface.co"
-headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+# Using Official Hugging Face Client to bypass CloudFront 403 errors
+@st.cache_resource
+def get_ai_client(api_key):
+    return InferenceClient(model="black-forest-labs/FLUX.1-schnell", token=api_key)
+
+client = get_ai_client(HF_API_KEY)
 
 # 3. Layout Setup
 col1, col2 = st.columns(2)
@@ -32,9 +35,6 @@ with col1:
         height=120
     )
     
-    # Optional image upload
-    uploaded_file = st.file_uploader("Optional: Upload a base image for context", type=["png", "jpg", "jpeg"])
-    
     generate_btn = st.button("🚀 Generate High-End AI Image")
 
 with col2:
@@ -43,36 +43,28 @@ with col2:
     if generate_btn and prompt:
         with st.spinner("🎨 FLUX AI is rendering your masterpiece... (Takes 10-25 seconds)"):
             try:
-                # Payload for FLUX Model
-                payload = {
-                    "inputs": prompt,
-                    "parameters": {"width": 1024, "height": 1024, "num_inference_steps": 4}
-                }
+                # Utilizing the official text_to_image method from the library
+                output_image = client.text_to_image(prompt)
                 
-                response = requests.post(MODEL_URL, headers=headers, json=payload)
+                # Display the final generated image
+                st.image(output_image, use_container_width=True, caption="Generated via FLUX Official Client")
                 
-                if response.status_code == 200:
-                    image_data = response.content
-                    output_image = Image.open(io.BytesIO(image_data))
-                    
-                    # Display the final generated image
-                    st.image(output_image, use_container_width=True, caption="Generated via FLUX")
-                    
-                    # Clean Download Button
-                    st.download_button(
-                        label="📥 Download HD Image",
-                        data=image_data,
-                        file_name="flux_output.png",
-                        mime="image/png"
-                    )
-                elif response.status_code == 503:
-                    st.warning("⏳ AI Model is warming up on the free server. Please wait 15 seconds and click 'Generate' again.")
-                else:
-                    st.error(f"API Error ({response.status_code}): {response.text}")
-                    st.info("💡 Make sure your Hugging Face token is valid and has 'Read' access.")
+                # Convert image to bytes for clean downloading
+                img_byte_arr = io.BytesIO()
+                output_image.save(img_byte_arr, format='PNG')
+                image_data = img_byte_arr.getvalue()
+                
+                # Clean Download Button
+                st.download_button(
+                    label="📥 Download HD Image",
+                    data=image_data,
+                    file_name="flux_output.png",
+                    mime="image/png"
+                )
                     
             except Exception as e:
-                st.error(f"Network error: {e}")
+                st.error(f"🚨 Connection Error: {e}")
+                st.info("💡 If this persists, verify that your token in Streamlit Secrets has proper 'Read' permissions on Hugging Face.")
     elif generate_btn and not prompt:
         st.warning("⚠️ Please write a detailed prompt instruction first!")
         
